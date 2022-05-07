@@ -1,6 +1,9 @@
 package cora
 
 import (
+	"crypto/tls"
+	"golang.org/x/net/http2"
+	"net"
 	"net/http"
 	"time"
 )
@@ -24,17 +27,34 @@ type Cora interface {
 	Put(string, interface{}, ...Header) Response
 	Delete(string, ...Header) Response
 	Options(string, ...Header) Response
-	Trace(string, ...Header)
 	Patch(string, interface{}, ...Header) Response
 	SetHost(string) Cora
 	SetHeaders(...Header) Cora
 }
 
-// New cora instance
-func New() Cora {
+// Http cora instance
+func Http() Cora {
 	return &cora{
 		client: &http.Client{
 			Timeout: time.Second * 60,
+		},
+		req: &http.Request{},
+	}
+}
+
+// Http2 cora instance
+func Http2() Cora {
+	return &cora{
+		client: &http.Client{
+			Timeout: time.Second * 60,
+			Transport: &http2.Transport{
+				// So http2.Transport doesn't complain the URL scheme isn't 'https'
+				AllowHTTP: true,
+				// Pretend we are dialing a TLS endpoint. (Note, we ignore the passed tls.Config)
+				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+					return net.Dial(network, addr)
+				},
+			},
 		},
 		req: &http.Request{},
 	}
@@ -91,9 +111,6 @@ func (c *cora) Delete(u string, h ...Header) Response {
 func (c *cora) Options(u string, h ...Header) Response {
 	return c.request(http.MethodOptions, u, nil, h...)
 }
-
-// Trace request
-func (c *cora) Trace(u string, h ...Header) {}
 
 // Patch request
 func (c *cora) Patch(u string, i interface{}, h ...Header) Response {
